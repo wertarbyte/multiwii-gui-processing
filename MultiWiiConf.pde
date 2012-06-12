@@ -75,6 +75,9 @@ boolean graphEnable = false;
 
 int version,versionMisMatch;
 float gx,gy,gz,ax,ay,az,magx,magy,magz,alt,head,angx,angy,debug1,debug2,debug3,debug4;
+/* bit mask indicating whether MAG_HOLD and/or HEADFREE is active */
+int headMode;
+float magHead,refHead;
 float angyLevelControl, angCalc;
 int i, j, blink;
 boolean blinkFlag;
@@ -332,6 +335,7 @@ private static final int
   MSP_MOTOR_PINS           =115,
   MSP_BOXNAMES             =116,
   MSP_PIDNAMES             =117,
+  MSP_HEADING              =125,
 
   MSP_SET_RAW_RC           =200,
   MSP_SET_RAW_GPS          =201,
@@ -475,6 +479,12 @@ public void evaluateCommand(byte cmd, int dataSize) {
     case MSP_ATTITUDE:
         angx = read16()/10;angy = read16()/10;
         head = read16(); break;
+    case MSP_HEADING:
+        headMode = read8();
+        head = read16();
+        magHead = read16();
+        refHead = read16();
+        break;
     case MSP_ALTITUDE:
         alt = read32(); break;
     case MSP_BAT:
@@ -606,6 +616,7 @@ void draw() {
     }
     if ((time-time3)>20 && ! toggleRead && ! toggleWrite) {
       sendRequestMSP(requestMSP(MSP_ATTITUDE));
+      sendRequestMSP(requestMSP(MSP_HEADING));
       time3=time;
     }
     if (toggleReset) {
@@ -1243,9 +1254,32 @@ void draw() {
   rotate(GPS_directionToHome*PI/180);
   strokeWeight(4);stroke(255,255,100);line(0,0, 0,-2.4*size);line(0,-2.4*size, -5 ,-2.4*size+10); line(0,-2.4*size, +5 ,-2.4*size+10);  
   rotate(-GPS_directionToHome*PI/180);
+
+  strokeWeight(1.5);fill(0);stroke(0);ellipse(0,  0,   2*size+7, 2*size+7);
+
+  strokeWeight(2);
+
+  if ((headMode & 1<<1) != 0) { // HEADFREE active
+    stroke(128, 255, 128);
+  } else {
+    stroke(128, 128, 255);
+  }
+  rotate(refHead*PI/180);
+  line(0,0, 0,-2*size);
+  rotate(-refHead*PI/180);
+
+  stroke(255);
   // compass quadrant
   strokeWeight(1.5);fill(0);stroke(0);
   ellipse(0,  0,   2.6*size+7, 2.6*size+7);
+
+  if ((headMode & 1<<0) != 0) { // MAG_HOLD active
+    stroke(255, 0, 0);
+    rotate(magHead*PI/180);
+    line(0,size*0.2, 0,-size*1.3); line(0,-size*1.3, -5 ,-size*1.3+10); line(0,-size*1.3, +5 ,-size*1.3+10);
+    rotate(-magHead*PI/180);
+  }
+
   // Compass rotating pointer
   stroke(255);
   rotate(head*PI/180);
