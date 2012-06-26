@@ -16,6 +16,8 @@ ListBox commListbox;
 
 static int CHECKBOXITEMS=0;
 static int PIDITEMS=10;
+static int AUX_CHANNELS=0;
+static int AUX_STEPS=0;
 int commListMax;
 
 cGraph g_graph;
@@ -94,7 +96,7 @@ int activation[];
 Button buttonCheckbox[];
 PFont font8,font12,font15;
 
-void create_checkboxes(String[] names) {
+void create_checkboxes(int aux_channels, int aux_steps, String[] names) {
   /* destroy old buttons */
   for (int i=0; i<CHECKBOXITEMS; i++) {
     buttonCheckbox[i].remove();
@@ -104,15 +106,15 @@ void create_checkboxes(String[] names) {
   /* create new list entries and buttons */
   checkbox = new CheckBox[names.length];
   buttonCheckbox = new Button[names.length];
-  activation = new int[names.length];
+  activation = new int[names.length * aux_channels * 3];
   for (String name : names) {
     buttonCheckbox[i] = controlP5.addButton("bcb"+i,1,xBox-30,yBox+20+13*i,68,12);
     buttonCheckbox[i].setColorBackground(red_);buttonCheckbox[i].setLabel(name);
     checkbox[i] =  controlP5.addCheckBox("cb"+i,xBox+40,yBox+20+13*i);
     checkbox[i].setColorActive(color(255));checkbox[i].setColorBackground(color(120));
-    checkbox[i].setItemsPerRow(12);checkbox[i].setSpacingColumn(10);
+    checkbox[i].setItemsPerRow(aux_channels*aux_steps);checkbox[i].setSpacingColumn(10);
     checkbox[i].setLabel("");
-    for (int j=1; j<=12; j++) checkbox[i].addItem(i + "_cb_" + j, j);
+    for (int j=1; j<=(aux_channels*aux_steps); j++) checkbox[i].addItem(i + "_cb_" + j, j);
     checkbox[i].hideLabels();
     i++;
   }
@@ -326,6 +328,7 @@ private static final int
   MSP_MOTOR_PINS           =115,
   MSP_BOXNAMES             =116,
   MSP_PIDNAMES             =117,
+  MSP_AUX_COUNT            =119,
   MSP_HEADING              =125,
 
   MSP_SET_RAW_RC           =200,
@@ -420,6 +423,32 @@ void sendRequestMSP(List<Byte> msp) {
     arr[i++] = b;
   }
   g_serial.write(arr); // send the complete byte sequence in one go
+}
+
+void setCheckboxes() {
+  for (int pi=0; pi<CHECKBOXITEMS; pi++) {
+    for (int s=0; s<(AUX_STEPS*AUX_CHANNELS); s++) {
+      int bit = pi*AUX_STEPS*AUX_CHANNELS+s;
+      if ((activation[bit/8] & 1<<(bit%8)) != 0) {
+        checkbox[pi].activate(s);
+      } else {
+        checkbox[pi].deactivate(s);
+      }
+    }
+  }
+}
+
+void getCheckboxes() {
+  for (int pi=0; pi<CHECKBOXITEMS; pi++) {
+    for (int s=0; s<(AUX_STEPS*AUX_CHANNELS); s++) {
+      int bit = pi*AUX_STEPS*AUX_CHANNELS+s;
+      if (checkbox[pi].getState(s)) {
+        activation[bit/8] |= 1<<(bit%8);
+      } else {
+        activation[bit/8] &= ~(1<<(bit%8));
+      }
+    }
+  }
 }
 
 public void evaluateCommand(byte cmd, int dataSize) {
@@ -544,14 +573,18 @@ public void evaluateCommand(byte cmd, int dataSize) {
         updateModelMSP_SET_PID();
         break;
     case MSP_BOX:
-        for( i=0;i<CHECKBOXITEMS;i++) {
-          activation[i] = read16();
-          for(int aa=0;aa<12;aa++) {
-            if ((activation[i]&(1<<aa))>0) checkbox[i].activate(aa); else checkbox[i].deactivate(aa);
-          }
-        } break;
+	activation = new int[(CHECKBOXITEMS*AUX_CHANNELS*AUX_STEPS+7)/8];
+        for( i=0;i<activation.length;i++) {
+          activation[i] = read8();
+        }
+        setCheckboxes();
+        break;
+    case MSP_AUX_COUNT:
+        AUX_CHANNELS = read8();
+        AUX_STEPS = read8();
+        break;
     case MSP_BOXNAMES:
-        create_checkboxes(new String(inBuf, 0, dataSize).split(";"));
+        create_checkboxes(AUX_CHANNELS, AUX_STEPS, new String(inBuf, 0, dataSize).split(";"));
         break;
     case MSP_PIDNAMES:
         /* TODO create GUI elements from this message */
@@ -617,7 +650,7 @@ void draw() {
     }
     if (toggleRead) {
       toggleRead=false;
-      int[] requests = {MSP_BOXNAMES, MSP_PIDNAMES, MSP_RC_TUNING, MSP_PID, MSP_BOX, MSP_MISC };
+      int[] requests = {MSP_AUX_COUNT, MSP_BOXNAMES, MSP_PIDNAMES, MSP_RC_TUNING, MSP_PID, MSP_BOX, MSP_MISC };
       sendRequestMSP(requestMSP(requests));
       buttonWRITE.setColorBackground(green_);
     }
@@ -672,14 +705,9 @@ void draw() {
 
       // MSP_SET_BOX
       payload = new ArrayList<Character>();
-      for(i=0;i<CHECKBOXITEMS;i++) {
-        activation[i] = 0;
-        for(aa=0;aa<12;aa++) {
-          activation[i] += (int)(checkbox[i].arrayValue()[aa]*(1<<aa));
-          //MWI.setProperty("box."+i+".aux"+i/3+"."+(aa%3),String.valueOf(checkbox[i].arrayValue()[aa]*(1<<aa)));
-        }
-        payload.add(char (activation[i] % 256) );
-        payload.add(char (activation[i] / 256)  );
+      getCheckboxes();
+      for(i=0;i<activation.length;i++) {
+        payload.add(char(activation[i] & 0xFF));
       }
       sendRequestMSP(requestMSP(MSP_SET_BOX,payload.toArray(new Character[payload.size()])));
      
