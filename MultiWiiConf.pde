@@ -74,9 +74,10 @@ grey_ = color(30, 30, 30);
 boolean graphEnable = false;
 
 int version,versionMisMatch;
+float gx,gy,gz,ax,ay,az,magx,magy,magz,alt,head,angx,angy,debug1,debug2,debug3,debug4;
 /* bit mask indicating whether MAG_HOLD and/or HEADFREE is active */
 int headMode;
-float gx,gy,gz,ax,ay,az,magx,magy,magz,alt,head,magHead,refHead,angx,angy,debug1,debug2,debug3,debug4;
+float magHead,refHead;
 float angyLevelControl, angCalc;
 int i, j, blink;
 boolean blinkFlag;
@@ -1259,26 +1260,26 @@ void draw() {
   strokeWeight(2);
 
   if ((headMode & 1<<1) != 0) { // HEADFREE active
-    stroke(128, 128, 255);
-  } else {
     stroke(128, 255, 128);
+  } else {
+    stroke(128, 128, 255);
   }
   rotate(refHead*PI/180);
-  line(0,size, 0,-size); line(0,-size, -5 ,-size+10); line(0,-size, +5 ,-size+10);
+  line(0,0, 0,-2*size);
   rotate(-refHead*PI/180);
+
+  stroke(255);
+  // compass quadrant
+  strokeWeight(1.5);fill(0);stroke(0);
+  ellipse(0,  0,   2.6*size+7, 2.6*size+7);
 
   if ((headMode & 1<<0) != 0) { // MAG_HOLD active
     stroke(255, 0, 0);
     rotate(magHead*PI/180);
-    line(0,size, 0,-size); line(0,-size, -5 ,-size+10); line(0,-size, +5 ,-size+10);
+    line(0,size*0.2, 0,-size*1.3); line(0,-size*1.3, -5 ,-size*1.3+10); line(0,-size*1.3, +5 ,-size*1.3+10);
     rotate(-magHead*PI/180);
   }
 
-  stroke(255);
-
-  // compass quadrant
-  strokeWeight(1.5);fill(0);stroke(0);
-  ellipse(0,  0,   2.6*size+7, 2.6*size+7);
   // Compass rotating pointer
   stroke(255);
   rotate(head*PI/180);
