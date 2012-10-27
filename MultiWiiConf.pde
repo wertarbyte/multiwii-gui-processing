@@ -351,7 +351,7 @@ private static final int
   MSP_SET_MISC             =207,
   MSP_RESET_CONF           =208,
 
-  MSP_SET_AUX              =220,
+  MSP_SET_AUX              =230,
 
   MSP_EEPROM_WRITE         =250,
   
